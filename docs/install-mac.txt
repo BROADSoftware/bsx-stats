@@ -1,0 +1,10 @@
+
+libvirt-python require libvirt to be installed on base os:
+
+# Install brew
+ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+
+brew install libvirt
+brew install pkg-config
+
+
