@@ -1,0 +1,45 @@
+---
+
+
+
+hosts:
+
+- name: bsa2
+  fqdn: bsa2.bsa.broadsoftware.com
+  ssh_user: sa
+  libvirt_connect: qemu+ssh://sa@bsa2.bsa.broadsoftware.com/system
+  volumes:
+  - path: /vol00
+    device: /dev/sda1
+  - path: /vol01
+  - path: /vol02
+  - path: /vol03
+  - path: /vol04
+    
+- name: bsa3
+  disabled: True
+  fqdn: bsa3.bsa.broadsoftware.com
+  ssh_user: sa
+  libvirt_connect: qemu+ssh://sa@bsa3.bsa.broadsoftware.com/system
+  volumes:
+  - path: /vol00
+    device: /dev/sda1
+  - path: /vol01
+  - path: /vol02
+  - path: /vol03
+  - path: /vol04
+    
+- name: bsa4
+  disabled: True
+  fqdn: bsa4.bsa.broadsoftware.com
+  ssh_user: sa
+  libvirt_connect: qemu+ssh://sa@bsa4.bsa.broadsoftware.com/system
+  volumes:
+  - path: /vol00
+    device: /dev/sda1
+  - path: /vol01
+  - path: /vol02
+  - path: /vol03
+  - path: /vol04
+    
+    
