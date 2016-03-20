@@ -16,88 +16,14 @@ import os
 import argparse        
 import libvirt
 from easydict import EasyDict as edict
-from pexpect import pxssh
 import xml.etree.ElementTree as ET
-import xlsxwriter
 import yaml
 import pprint
+import SshEngine
+import log
+import XlsEngine
 
 
-
-def ERROR(err):
-    if type(err) is str:
-        message = err
-    else:
-        message = err.__class__.__name__ + ": " + str(err)
-    print "* * * * ERROR: " + str(message)
-    exit(1)
-
-def perform_ssh_cmd(ssh, cmd):
-    ssh.sendline (cmd)
-    ssh.prompt()
-    result =  ssh.before.splitlines()
-    return result
-    
-        
-def perform_vol_stats(ssh, hostConfig):
-    """Grab volume statistics from real system.
-    Return an array of volumes statistics
-    [ 
-      { device: "/dev/sda1", size: "1000000", used: "400000", free: "600000", path: '/vol00' },
-      { ...},...
-    ]
-    Only volumes defined in configuration file will be present, Also configuration file order is preserved
-    """
-    result = perform_ssh_cmd(ssh, 'df')
-    foundVols = []
-    for line in result[2:]:
-        x =  line.split()
-        vol = edict({}) 
-        vol.device = x[0]
-        vol.size = x[1]
-        vol.used = x[2]
-        vol.free = x[3]
-        vol.mount = x[5]
-        foundVols.append(vol)
-    #print(foundVols)
-    # Now loop on config.volumes to retains only configured ones, and preserve order from configuration
-    volByDevice = { x.device: x for x in foundVols }
-    volByMount = { x.mount: x for x in foundVols }
-    result = []
-    for cVolume in hostConfig.volumes:
-        if 'device' in cVolume and cVolume.device in volByDevice:
-            # In this case, path is not the mount point. That's means space is shared with other stuff
-            vol = volByDevice[cVolume.device]
-            vol.path = cVolume.path
-            result.append(vol)
-        elif 'path' in cVolume and cVolume.path in volByMount:
-            # In this case, volume is at the mount point.
-            vol = volByMount[cVolume.path]
-            vol.path = cVolume.path
-            result.append(vol)
-        else:
-            ERROR("Hosts:{0}. Volume {1} not found on real system".format(hostConfig.name, cVolume))
-    return result
-    
-    
-def perform_ls(ssh):
-    result = perform_ssh_cmd(ssh, 'ls -l $(find / -path \'/vol*/**\' -type f -print 2>/dev/null)')
-    print(result)
-
-def perform_free(ssh):
-    result = perform_ssh_cmd(ssh, 'free')
-    print(result)
-
-    
-def perform_ssh_ops(hostConfig, hostResult):
-    ssh = pxssh.pxssh()
-    ssh.login(hostConfig.fqdn, hostConfig.ssh_user)
-    hostResult.volumes = perform_vol_stats(ssh, hostConfig)
-    #perform_ls(ssh)
-    #perform_free(ssh)
-    ssh.logout()
-    ssh.close()
-         
    
 def main():
     parser = argparse.ArgumentParser()
@@ -107,6 +33,7 @@ def main():
     parser.add_argument('--dumpstats', action='store_true')
 
     param = parser.parse_args()
+    targetXlsName = param.out
     configFile = param.config
     dumpConfig = param.dumpconfig
     dumpStats = param.dumpstats
@@ -115,21 +42,31 @@ def main():
         pp = pprint.PrettyPrinter(indent=2)
 
     if not os.path.isfile(configFile):
-        ERROR("'{0}' is not a readable file!".format(configFile))
+        log.ERROR("'{0}' is not a readable file!".format(configFile))
     config = edict(yaml.load(open(configFile)))
     if dumpConfig:
         pp.pprint(config)
 
-    statsByHost = edict({}) 
+    stats = edict({}) 
+    stats.hosts = []
+    
     for hostConfig in config.hosts:
         if 'disabled' not in hostConfig or not hostConfig.disabled:
-            statsByHost[hostConfig.name] = edict({}) 
-            perform_ssh_ops(hostConfig,  statsByHost[hostConfig.name])
+            hstats = edict({}) 
+            hstats.name = hostConfig.name
+            print("Grab system info from {0}...".format(hstats.name))
+            sshEngine = SshEngine.SshEngine(hostConfig)
+            hstats.volumes = sshEngine.perform_vol_stats()
+            #perform_ls(ssh)
+            #perform_free(ssh)
+            sshEngine.close()
+            stats.hosts.append(hstats)
             
     if dumpStats:
-        pp.pprint(statsByHost)
+        pp.pprint(stats)
             
-
+    xlsEngine = XlsEngine.XlsEngine(targetXlsName)
+    xlsEngine.addPhysVolumesSheet(stats)
 
    
 def main2():
@@ -143,6 +80,9 @@ def main2():
     print domains
     domainNames = conn.listDefinedDomains()
     print domainNames
+    
+    import xlsxwriter
+
     workbook = xlsxwriter.Workbook('test1.xlsx')
     header = workbook.add_format({'bold': True, 'align': 'center'})
     worksheet = workbook.add_worksheet('Volumes')
@@ -176,6 +116,7 @@ def main2():
             row += 1
             
         
+    from pexpect import pxssh
         
     ssh = pxssh.pxssh()
     ssh.login ("bsa2.bsa.broadsoftware.com", "sa")
