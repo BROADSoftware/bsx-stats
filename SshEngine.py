@@ -24,17 +24,18 @@ class SshEngine:
     
             
     def perform_vol_stats(self):
-        """Grab volume statistics from real system.
+        """Grab volumes statistics from real system.
         Return an array of volumes statistics
         [ 
           { device: "/dev/sda1", size: "1000000", used: "400000", free: "600000", path: '/vol00' },
           { ...},...
         ]
         Only volumes defined in configuration file will be present, Also configuration file order is preserved
+        Result are number of 1k blocks
         """
-        result = self.perform_ssh_cmd('df --block-size=1K')
+        stdout = self.perform_ssh_cmd('df --block-size=1K')
         foundVols = []
-        for line in result[2:]:
+        for line in stdout[2:]:
             x =  line.split()
             vol = edict({}) 
             vol.device = x[0]
@@ -64,11 +65,57 @@ class SshEngine:
         return result
         
         
-    def perform_ls(self):
-        result = self.perform_ssh_cmd('ls -l $(find / -path \'/vol*/**\' -type f -print 2>/dev/null)')
-        print(result)
+    def perform_ls(self, path):
+        """List all files in a given path (Volume in most case)
+        Return an array as:
+        [ { name: '/vol01/xxx/yy', size: 1111111 } ]
+        Size in bytes
+        """
+        if not path.endswith('/'):
+            path = path + '/'
+            
+        stdout = self.perform_ssh_cmd('ls -l $(find / -path \'' + path + '**\' -type f -print 2>/dev/null)')
+        result = []
+        for line in stdout[1:]:
+            f = edict({}) 
+            x = line.split()
+            f.size = float(x[4])
+            f.name = x[8]
+            result.append(f)
+        return result
+
+    def perform_cpu_count(self):
+        """Grab the number of cpu
+        Return an int
+        """
+        stdout = self.perform_ssh_cmd('cat /proc/cpuinfo | grep processor | wc -l')
+        line = stdout[1]
+        return int(line)
+        
     
     def perform_free(self):
-        result = self.perform_ssh_cmd('free')
-        print(result)
+        """Grab memory statistics from read system
+        Return a double hash, as:
+        { memory: { total: 11111, used: 11111, free: 22222 }, swap: { total: 11111, used: 11111, free: 22222 } }
+        Result are in bytes
+        """
+        stdout = self.perform_ssh_cmd('free -b')
+        result = edict({}) 
+        
+        result.ram =  edict({}) 
+        x = stdout[2].split()
+        result.ram.size = float(x[1])
+        result.ram.used = float(x[2])
+        result.ram.free = float(x[3])
+        result.ram.shared = float(x[4])
+        result.ram.cache = float(x[5])
+        result.ram.available = float(x[6])
+
+        result.swap = edict({})
+        x = stdout[3].split()
+        result.swap.size = float(x[1])
+        result.swap.used = float(x[2])
+        result.swap.free = float(x[3])
+        
+        return result 
 

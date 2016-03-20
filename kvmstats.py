@@ -57,8 +57,11 @@ def main():
             print("Grab system info from {0}...".format(hstats.name))
             sshEngine = SshEngine.SshEngine(hostConfig)
             hstats.volumes = sshEngine.perform_vol_stats()
-            #perform_ls(ssh)
-            #perform_free(ssh)
+            for vol in  hstats.volumes:
+                vol.files = sshEngine.perform_ls(vol.path)
+                vol.sumOfFiles = reduce(lambda x,y: x+y, map(lambda x:x.size, vol.files))
+            hstats.memory = sshEngine.perform_free()
+            hstats.cpus = sshEngine.perform_cpu_count()
             sshEngine.close()
             stats.hosts.append(hstats)
             
@@ -66,7 +69,9 @@ def main():
         pp.pprint(stats)
             
     xlsEngine = XlsEngine.XlsEngine(targetXlsName)
+    xlsEngine.addHostsSheet(stats)
     xlsEngine.addPhysVolumesSheet(stats)
+    xlsEngine.addFiles(stats)
 
    
 def main2():
