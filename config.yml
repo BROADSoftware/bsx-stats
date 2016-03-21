@@ -10,6 +10,7 @@ hosts:
   fqdn: bsa2.bsa.broadsoftware.com
   ssh_user: sa
   libvirt_connect: qemu+ssh://sa@bsa2.bsa.broadsoftware.com/system
+  system_memory_mb: 2048
   volumes:
   - path: /vol00
     device: /dev/sda1
@@ -23,6 +24,7 @@ hosts:
   fqdn: bsa3.bsa.broadsoftware.com
   ssh_user: sa
   libvirt_connect: qemu+ssh://sa@bsa3.bsa.broadsoftware.com/system
+  system_memory_mb: 2048
   volumes:
   - path: /vol00
     device: /dev/sda1
@@ -36,6 +38,7 @@ hosts:
   fqdn: bsa4.bsa.broadsoftware.com
   ssh_user: sa
   libvirt_connect: qemu+ssh://sa@bsa4.bsa.broadsoftware.com/system
+  system_memory_mb: 2048
   volumes:
   - path: /vol00
     device: /dev/sda1
