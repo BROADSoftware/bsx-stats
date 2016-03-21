@@ -14,16 +14,44 @@
 #
 import os
 import argparse        
-import libvirt
 from easydict import EasyDict as edict
-import xml.etree.ElementTree as ET
 import yaml
 import pprint
 import SshEngine
 import log
 import XlsEngine
+import LibvirtEngine
+import re
 
-
+# Apply post info fetching processing
+def enrich(stats, config):
+    
+    vmByVDisk = edict({})  # This map to associate vdisk file to its vm
+    cfnRegex = re.compile(config.cluster_from_name_regex)
+    rfnRegex = re.compile(config.role_from_name_regex)
+    for host in stats.hosts:
+        for vm in host.vms:
+            m = cfnRegex.match(vm.name)
+            if m :
+                vm.cluster = m.group(1)
+            m = rfnRegex.match(vm.name)
+            if m :
+                vm.role = m.group(1)
+            for vdisk in vm.vdisks:
+                vmByVDisk[vdisk.image] = vm
+        
+    for host in stats.hosts:
+        for volume in host.volumes:
+            for f in volume.files:
+                if f.name in vmByVDisk:
+                    vm = vmByVDisk[f.name]
+                    f.vm = vm.name
+                    if 'role' in vm:
+                        f.role = vm.role
+                    if 'cluster' in vm:
+                        f.cluster = vm.cluster
+                
+                
    
 def main():
     parser = argparse.ArgumentParser()
@@ -63,8 +91,20 @@ def main():
             hstats.memory = sshEngine.perform_free()
             hstats.cpus = sshEngine.perform_cpu_count()
             sshEngine.close()
-            stats.hosts.append(hstats)
             
+            print("Grab libvirt info from {0}...".format(hstats.name))
+            libvirt = LibvirtEngine.LibvirtEngine(hostConfig)
+            hstats.vms = libvirt.grab_vms()
+            hstats.vms_memory = reduce(lambda x,y:x+y, map(lambda x:(x.memory*x.running), hstats.vms))
+            hstats.vms_vcpus = reduce(lambda x,y:x+y, map(lambda x:(x.vcpus*x.running), hstats.vms))
+            
+            stats.hosts.append(hstats)
+
+    if dumpStats:
+        pp.pprint(stats)
+    
+    enrich(stats, config)
+    
     if dumpStats:
         pp.pprint(stats)
             
@@ -72,76 +112,9 @@ def main():
     xlsEngine.addHostsSheet(stats)
     xlsEngine.addPhysVolumesSheet(stats)
     xlsEngine.addFiles(stats)
+    xlsEngine.addVMs(stats)
 
-   
-def main2():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--xxx', required=False)
-    param = parser.parse_args()
-    print param
-    #conn = libvirt.open("qemu+ssh://root@bsa3.bsa.broadsoftware.com/system?socket=/var/run/libvirt/libvirt-sock")
-    conn = libvirt.open("qemu+ssh://sa@bsa2.bsa.broadsoftware.com/system")
-    domains = conn.listDomainsID()
-    print domains
-    domainNames = conn.listDefinedDomains()
-    print domainNames
-    
-    import xlsxwriter
 
-    workbook = xlsxwriter.Workbook('test1.xlsx')
-    header = workbook.add_format({'bold': True, 'align': 'center'})
-    worksheet = workbook.add_worksheet('Volumes')
-    
-    worksheet.set_column(0, 0, 10)
-    worksheet.set_column(2, 2, 40)
-    worksheet.write(0, 0, "VM", header)
-    worksheet.write(0, 1, "Device", header)
-    worksheet.write(0, 2, "File", header)
-    row = 1
-
-    for domainID in domains:
-        dom = conn.lookupByID(domainID)
-        print dom.name()
-        
-        infos = dom.info()
-        print infos
-        xml = dom.XMLDesc(0)
-        print xml
-        root = ET.fromstring(xml)
-        print root
-        for disk in root.findall("devices/disk"):
-            print disk.attrib
-            image =  disk.find("source").get("file")
-            print image
-            dev =  disk.find("target").get("dev")
-            print dev
-            worksheet.write(row, 0, str(dom.name()))
-            worksheet.write(row, 1, dev)
-            worksheet.write(row, 2, image)
-            row += 1
-            
-        
-    from pexpect import pxssh
-        
-    ssh = pxssh.pxssh()
-    ssh.login ("bsa2.bsa.broadsoftware.com", "sa")
-    ssh.sendline ('free ')
-    ssh.prompt()
-    ramString =  ssh.before
-    print(ramString)
-
-    ssh.sendline ('df -h | sort')
-    ssh.prompt()
-    df =  ssh.before
-    print(df)
-
-    ssh.sendline ('ls -l $(find / -path \'/vol*/**\' -type f -print 2>/dev/null)')
-    ssh.prompt()
-    ls =  ssh.before
-    print("----------------------")
-    print(ls)
-
-    
 
 
 if __name__ == "__main__":

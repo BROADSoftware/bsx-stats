@@ -1,6 +1,8 @@
 ---
 
+cluster_from_name_regex: "^(.+)_.+$"
 
+role_from_name_regex: "^.+_(.+)$"
 
 hosts:
 
