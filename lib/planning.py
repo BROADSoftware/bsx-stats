@@ -1,6 +1,6 @@
 
 from easydict import EasyDict as edict
-
+import log
                    
 
 def initClusterLine(stats):
@@ -17,6 +17,41 @@ def initClusterLine(stats):
         
         
     return cluster
+
+def adjustProject(project, config):
+    patternByName = dict((pattern.name, pattern) for pattern in project.patterns)
+    for node in project.nodes:
+        node.features = patternByName[node.pattern]
+        buildVolumeList(node, config)
+        
+
+
+def buildVolumeList(node, config):
+    # -------------------------------- Handle root disk
+    if 'root_volume_index' in node:
+        idx = node.root_volume_index
+    else:
+        idx = 0
+    nbrRootVolumes = len(config.hosts[node.host].root_volumes)
+    node.root_volume = config.hosts[node.host].root_volumes[idx % nbrRootVolumes].path
+    # ----------------------------- Handle Data disks
+    if "data_disks" in node.features and len(node.features.data_disks) > 0:
+        nbrDataVolume = len(config.hosts[node.host].data_volumes)
+        if "base_volume_index" in node:
+            for i in range(len(node.features.data_disks)):
+                node.features.data_disks[i].volume = config.hosts[node.host].data_volumes[(i + node.base_volume_index) % nbrDataVolume].path
+        elif "volume_indexes" in node:
+            if len(node.volume_indexes) != nbrDataVolume:
+                log.ERROR("Node {0}: volume_indexes size ({1} != host.data_volumes size ({2})".format(node.name, len(node.volume_indexes),nbrDataVolume))
+            for i in range(len(node.features.data_disks)):
+                node.features.data_disks[i].volume = config.hosts[node.host].data_volumes[node.volume_indexes[i]].path
+        else:
+            log.ERROR("Node {0}: Either 'base_volume_index' or 'volume_indexes' must be defined!".format(node.name))
+
+
+
+
+
 
 
 def build(stats, projects):

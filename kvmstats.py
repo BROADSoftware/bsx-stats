@@ -67,7 +67,10 @@ def enrich(stats, config):
                 vdisk.size = sizeByFile[vdisk.image]
                 vdisk.volume = volumeByFile[vdisk.image]
              
-            
+def adjustConfig(config):
+    for host in config.hosts:
+        host.volumes = host.root_volumes
+        host.volumes.extend(host.data_volumes)            
                         
                      
    
@@ -96,7 +99,7 @@ def main():
     if not os.path.isfile(configFile):
         log.ERROR("'{0}' is not a readable file!".format(configFile))
     config = edict(yaml.load(open(configFile)))
-        
+    adjustConfig(config)    
     if dumpConfig:
         pp.pprint(config)
 
@@ -106,10 +109,6 @@ def main():
             log.ERROR("'{0}' is not a readable file!".format(configFile))
         else:
             projects.append(edict(yaml.load(open(pf))))
-
-    if dumpProjects:
-        for prj in projects:
-            pp.pprint(prj)
 
     stats = edict({}) 
     stats.hosts = []
@@ -141,6 +140,11 @@ def main():
     if dumpStats:
         pp.pprint(stats)
             
+    for prj in projects:
+        plng.adjustProject(prj, config)
+        if dumpProjects:
+            pp.pprint(prj)
+
     planning = plng.build(stats, projects)
     
     if dumpPlanning:

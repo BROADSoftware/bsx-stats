@@ -11,9 +11,10 @@ hosts:
   ssh_user: sa
   libvirt_connect: qemu+ssh://sa@bsa2.bsa.broadsoftware.com/system
   system_memory_mb: 2048
-  volumes:
+  root_volumes:
   - path: /vol00
     device: /dev/sda1
+  data_volumes:
   - path: /vol01
   - path: /vol02
   - path: /vol03
@@ -25,9 +26,10 @@ hosts:
   ssh_user: sa
   libvirt_connect: qemu+ssh://sa@bsa3.bsa.broadsoftware.com/system
   system_memory_mb: 2048
-  volumes:
+  root_volumes:
   - path: /vol00
     device: /dev/sda1
+  data_volumes:
   - path: /vol01
   - path: /vol02
   - path: /vol03
@@ -40,8 +42,10 @@ hosts:
   libvirt_connect: qemu+ssh://sa@bsa4.bsa.broadsoftware.com/system
   system_memory_mb: 2048
   volumes:
+  root_volumes:
   - path: /vol00
     device: /dev/sda1
+  data_volumes:
   - path: /vol01
   - path: /vol02
   - path: /vol03
