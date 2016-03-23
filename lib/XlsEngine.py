@@ -1,12 +1,6 @@
 import xlsxwriter
 from easydict import EasyDict as edict
-
-def k2g(val):
-    return val / (1024*1024)
-
-def b2g(val):
-    return val / (1024*1024*1024)
-
+from x2y import b2g as b2g
 
 columsIdx = [ 
              'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 
@@ -23,14 +17,17 @@ columsIdx = [
 
 class XlsEngine:
     
-    
-    
     def __init__(self, filename):
         self.workbook = xlsxwriter.Workbook(filename + '.xlsx')
         self.headerFormat = self.workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'text_wrap': True})
         self.num0Format = self.workbook.add_format({'num_format': '###,###,##0'})
         self.blackFormat = self.workbook.add_format({'bg_color': 'black'})
-
+        self.num0ProjectFormat = self.workbook.add_format({'num_format': '###,###,##0', 'italic': True, 'font_color': '#606060'})
+        self.projectFormat = self.workbook.add_format({'italic': True, 'font_color': '#606060'})
+        self.lineTitleFormat = self.workbook.add_format({'bold': True, 'align': 'right', 'valign': 'vcenter', 'text_wrap': True})
+        
+    def close(self):
+        self.workbook.close()
 
     def addPhysVolumesSheet(self, stats):
         PVOLS_HOST_COL = 0
@@ -57,9 +54,9 @@ class XlsEngine:
             for volume in host.volumes:
                 ws.write(row, PVOLS_HOST_COL, host.name )
                 ws.write(row, PVOLS_PATH_COL, volume.path)
-                ws.write(row, PVOLS_SIZE_COL, k2g(volume.size))
-                ws.write(row, PVOLS_USED_COL, k2g(volume.used))
-                ws.write(row, PVOLS_FREE_COL, k2g(volume.free))
+                ws.write(row, PVOLS_SIZE_COL, b2g(volume.size))
+                ws.write(row, PVOLS_USED_COL, b2g(volume.used))
+                ws.write(row, PVOLS_FREE_COL, b2g(volume.free))
                 ws.write(row, PVOLS_FILES_COL, b2g(volume.sumOfFiles))
                 ws.write(row, PVOLS_EXT_COL, '=' + columsIdx[PVOLS_USED_COL] + str(row+1) + '-' + columsIdx[PVOLS_FILES_COL] + str(row+1))
                 row += 1
@@ -244,31 +241,35 @@ class XlsEngine:
                 col += 1
             ws.merge_range(0, layout.firstColumn + 1, 0, col - 1, host.name, self.headerFormat)
             ws.set_column(PLN_FIRST_VOLUME_COL + layout.firstColumn, col - 1, 6, self.num0Format)
+            ws.set_column(PLN_FIRST_VOLUME_COL + layout.firstColumn, col - 1, 6, None, { 'hidden': 1 })
             
             layouts.append(layout)
 
         row = 2
+        ctype = 'base'
         for clusterName in planning.clusterList:
             cluster = planning.clusters[clusterName]
-            ws.write(row, PLN_CLUSTER_COL, clusterName )
-            ws.write(row, PLN_EXISTS_COL, 1 )
-            ws.write(row, PLN_RUN_COL, cluster.running )
+            if cluster.type != ctype:
+                row += 0
+                ctype = cluster.type
+            ws.write(row, PLN_CLUSTER_COL, clusterName, self.projectFormat if cluster.type == 'project' else None )
+            ws.write(row, PLN_EXISTS_COL, 1, self.projectFormat if cluster.type == 'project' else None )
+            ws.write(row, PLN_RUN_COL, cluster.running, self.projectFormat if cluster.type == 'project' else None )
             
             for layout in layouts:
                 col = layout.firstColumn
                 host = cluster.hosts[layout.host.name]
-                ws.write(row, PLN_RAM_COL + col, '=' + str(b2g(host.ram)) + '*' + columsIdx[PLN_EXISTS_COL] + str(row+1) + '*' + columsIdx[PLN_RUN_COL] + str(row+1))
-                ws.write(row, PLN_CPU_COL + col, '=' + str(host.vcpus) + '*' + columsIdx[PLN_EXISTS_COL] + str(row+1) + '*' + columsIdx[PLN_RUN_COL] + str(row+1))
-                #ws.write(row, PLN_STORAGE_COL + col, '=' + str(b2g(host.storage)) + '*' + columsIdx[PLN_EXISTS_COL] + str(row+1))
-                ws.write(row, PLN_STORAGE_COL + col, "=SUM(" + columsIdx[PLN_FIRST_VOLUME_COL + col] + str(row+1) + ":" + columsIdx[PLN_FIRST_VOLUME_COL + col + len(layout.host.volumes) - 1] + str(row+1) + ')' )
+                ws.write(row, PLN_RAM_COL + col, '=' + str(b2g(host.ram)) + '*' + columsIdx[PLN_EXISTS_COL] + str(row+1) + '*' + columsIdx[PLN_RUN_COL] + str(row+1), self.num0ProjectFormat if cluster.type == 'project' else None)
+                ws.write(row, PLN_CPU_COL + col, '=' + str(host.vcpus) + '*' + columsIdx[PLN_EXISTS_COL] + str(row+1) + '*' + columsIdx[PLN_RUN_COL] + str(row+1), self.num0ProjectFormat if cluster.type == 'project' else None)
+                ws.write(row, PLN_STORAGE_COL + col, "=SUM(" + columsIdx[PLN_FIRST_VOLUME_COL + col] + str(row+1) + ":" + columsIdx[PLN_FIRST_VOLUME_COL + col + len(layout.host.volumes) - 1] + str(row+1) + ')', self.num0ProjectFormat if cluster.type == 'project' else None )
                 col += PLN_FIRST_VOLUME_COL
                 for volume in layout.volumes:
-                    ws.write(row, col, '=' + str(b2g(host.storageByVolume[volume])) + '*' + columsIdx[PLN_EXISTS_COL] + str(row+1))
+                    ws.write(row, col, '=' + str(b2g(host.storageByVolume[volume])) + '*' + columsIdx[PLN_EXISTS_COL] + str(row+1), self.num0ProjectFormat if cluster.type == 'project' else None)
                     col += 1
             row += 1
 
         row += 1    
-        ws.write(row, PLN_CLUSTER_COL, "Sum:", self.headerFormat )
+        ws.write(row, PLN_CLUSTER_COL, "Sum:", self.lineTitleFormat )
         for clusterName in planning.clusterList:
             for layout in layouts:
                 col = layout.firstColumn
@@ -281,7 +282,7 @@ class XlsEngine:
                     col += 1
 
         row += 1
-        ws.write(row, PLN_CLUSTER_COL, "Max:", self.headerFormat )
+        ws.write(row, PLN_CLUSTER_COL, "Max:", self.lineTitleFormat )
         for layout in layouts:
             col = layout.firstColumn
             ws.write(row, PLN_RAM_COL + col, b2g(layout.host.memory.ram.size))
@@ -289,11 +290,11 @@ class XlsEngine:
             ws.write(row, PLN_STORAGE_COL + col, "=SUM(" + columsIdx[PLN_FIRST_VOLUME_COL + col] + str(row+1) + ":" + columsIdx[PLN_FIRST_VOLUME_COL + col + len(layout.host.volumes) - 1] + str(row+1) + ')' )
             col += PLN_FIRST_VOLUME_COL
             for volume in layout.host.volumes:
-                ws.write(row, col, k2g(volume.size))
+                ws.write(row, col, b2g(volume.size))
                 col += 1
             
         row += 1
-        ws.write(row, PLN_CLUSTER_COL, "Free:", self.headerFormat )
+        ws.write(row, PLN_CLUSTER_COL, "Free:", self.lineTitleFormat )
         for layout in layouts:
             col = layout.firstColumn
             for c in range(PLN_RAM_COL, PLN_FIRST_VOLUME_COL + len(layout.host.volumes)):

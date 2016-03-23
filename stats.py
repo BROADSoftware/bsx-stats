@@ -23,6 +23,7 @@ import lib.SshEngine as SshEngine
 import lib.XlsEngine as XlsEngine
 import lib.LibvirtEngine as LibvirtEngine
 import lib.planning as plng
+from lib.x2y import m2b as m2b
 
 
 # Apply post info fetching processing
@@ -68,7 +69,7 @@ def enrich(stats, config):
                 vdisk.volume = volumeByFile[vdisk.image]
              
 def adjustConfig(config):
-    for host in config.hosts:
+    for host in config.hosts.itervalues():
         host.volumes = host.root_volumes
         host.volumes.extend(host.data_volumes)            
                         
@@ -99,8 +100,12 @@ def main():
     if not os.path.isfile(configFile):
         log.ERROR("'{0}' is not a readable file!".format(configFile))
     config = edict(yaml.load(open(configFile)))
+
+    
     adjustConfig(config)    
+
     if dumpConfig:
+        print "\n------------------------ Config:\n"
         pp.pprint(config)
 
     projects = []        
@@ -113,10 +118,12 @@ def main():
     stats = edict({}) 
     stats.hosts = []
     
-    for hostConfig in config.hosts:
-        if 'disabled' not in hostConfig or not hostConfig.disabled:
+    hostNames = sorted(list(config.hosts.keys()))
+    for hostName in hostNames:
+        hostConfig = config.hosts[hostName]
+        if 'stats_disabled' not in hostConfig or not hostConfig.stats_disabled:
             hstats = edict({}) 
-            hstats.name = hostConfig.name
+            hstats.name = hostName
             print("Grab system info from {0}...".format(hstats.name))
             sshEngine = SshEngine.SshEngine(hostConfig)
             hstats.volumes = sshEngine.perform_vol_stats()
@@ -132,31 +139,34 @@ def main():
             hstats.vms = libvirt.grab_vms()
             hstats.vms_memory = reduce(lambda x,y:x+y, map(lambda x:(x.memory*x.running), hstats.vms))
             hstats.vms_vcpus = reduce(lambda x,y:x+y, map(lambda x:(x.vcpus*x.running), hstats.vms))
-            hstats.system_memory = hostConfig.system_memory_mb * (1024 * 1024)
+            hstats.system_memory = m2b(hostConfig.system_memory_mb)
             stats.hosts.append(hstats)
 
     enrich(stats, config)
     
     if dumpStats:
+        print "\n------------------------ Stats:"
         pp.pprint(stats)
             
     for prj in projects:
         plng.adjustProject(prj, config)
         if dumpProjects:
+            print "\n------------------------ Project:"
             pp.pprint(prj)
 
     planning = plng.build(stats, projects)
     
     if dumpPlanning:
+        print "\n------------------------ Planning:"
         pp.pprint(planning)
             
     xlsEngine = XlsEngine.XlsEngine(targetXlsName)
+    xlsEngine.addPlanning(stats, planning)
     xlsEngine.addHostsSheet(stats)
     xlsEngine.addPhysVolumesSheet(stats)
     xlsEngine.addFiles(stats)
     xlsEngine.addVMs(stats)
-    xlsEngine.addPlanning(stats, planning)
-
+    xlsEngine.close()
 
 
 

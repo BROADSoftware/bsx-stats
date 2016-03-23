@@ -2,6 +2,7 @@
 from easydict import EasyDict as edict
 from pexpect import pxssh
 import log
+from x2y import k2b as k2b
 
 class SshEngine:
     
@@ -39,9 +40,9 @@ class SshEngine:
             x =  line.split()
             vol = edict({}) 
             vol.device = x[0]
-            vol.size = float(x[1])
-            vol.used = float(x[2])
-            vol.free = float(x[3])
+            vol.size = k2b(int(x[1]))
+            vol.used = k2b(int(x[2]))
+            vol.free = k2b(int(x[3]))
             vol.mount = x[5]
             foundVols.append(vol)
         #print(foundVols)

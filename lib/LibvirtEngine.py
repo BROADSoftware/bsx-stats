@@ -2,7 +2,7 @@
 from easydict import EasyDict as edict
 import libvirt
 import xml.etree.ElementTree as ElementTree
-
+from x2y import k2b as k2b
 
 class LibvirtEngine:
     
@@ -21,7 +21,7 @@ class LibvirtEngine:
         for domain in domains:
             vm = edict({}) 
             vm.name = domain.name()
-            vm.memory = domain.info()[1] * 1024     # Memory are internaly handled in bytes
+            vm.memory = k2b(domain.info()[1])     # Memory is provided as KB and internally handled in bytes
             vm.vcpus = domain.info()[3]
             vm.state = domain.info()[0]
             vm.running = 1 if vm.state == 1 else 0
