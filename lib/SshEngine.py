@@ -1,13 +1,26 @@
 
 from easydict import EasyDict as edict
-from pexpect import pxssh
+from pexpect import pxssh 
+
 import log
 from x2y import k2b as k2b
 
 class SshEngine:
     
     def __init__(self, hostConfig):
-        self.hostConfig = hostConfig
+        logged = False
+        tryCount = 0
+        while not logged:
+            try:
+                self.hostConfig = hostConfig
+                logged = True
+            except Exception as e:
+                if tryCount >= 4:
+                    log.ERROR("Too many exception on SSH connection for host {0}. Given up".format(hostConfig.fqdn))
+                else:
+                    print("Exception on SSH connection: {0} Will retry".format(e.strerror))
+                    tryCount += 1
+            
         self.ssh = pxssh.pxssh()
         self.ssh.login(hostConfig.fqdn, hostConfig.ssh_user)
 

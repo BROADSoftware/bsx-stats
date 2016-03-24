@@ -24,7 +24,7 @@ import lib.XlsEngine as XlsEngine
 import lib.LibvirtEngine as LibvirtEngine
 import lib.planning as plng
 from lib.x2y import m2b as m2b
-
+from threading import Thread
 
 # Apply post info fetching processing
 def enrich(stats, config):
@@ -73,6 +73,33 @@ def adjustConfig(config):
         host.volumes = host.root_volumes
         host.volumes.extend(host.data_volumes)            
                         
+
+class GraberThread(Thread):
+    
+    def __init__(self, hstats, hostConfig):
+        Thread.__init__(self)
+        self.hstats = hstats
+        self.hostConfig = hostConfig
+    
+    def run(self):
+        print("Grab system info from {0}...".format(self.hstats.name))
+        sshEngine = SshEngine.SshEngine(self.hostConfig)
+        self.hstats.volumes = sshEngine.perform_vol_stats()
+        for vol in  self.hstats.volumes:
+            vol.files = sshEngine.perform_ls(vol.path)
+            vol.sumOfFiles = reduce(lambda x,y: x+y, map(lambda x:x.size, vol.files))
+        self.hstats.memory = sshEngine.perform_free()
+        self.hstats.cpus = sshEngine.perform_cpu_count()
+        sshEngine.close()
+        
+        print("Grab libvirt info from {0}...".format(self.hstats.name))
+        libvirt = LibvirtEngine.LibvirtEngine(self.hostConfig)
+        self.hstats.vms = libvirt.grab_vms()
+        self.hstats.vms_memory = reduce(lambda x,y:x+y, map(lambda x:(x.memory*x.running), self.hstats.vms))
+        self.hstats.vms_vcpus = reduce(lambda x,y:x+y, map(lambda x:(x.vcpus*x.running), self.hstats.vms))
+        self.hstats.system_memory = m2b(self.hostConfig.system_memory_mb)
+
+
                      
    
 def main():
@@ -117,6 +144,7 @@ def main():
 
     stats = edict({}) 
     stats.hosts = []
+    myThreads = []
     
     hostNames = sorted(list(config.hosts.keys()))
     for hostName in hostNames:
@@ -124,23 +152,19 @@ def main():
         if 'stats_disabled' not in hostConfig or not hostConfig.stats_disabled:
             hstats = edict({}) 
             hstats.name = hostName
-            print("Grab system info from {0}...".format(hstats.name))
-            sshEngine = SshEngine.SshEngine(hostConfig)
-            hstats.volumes = sshEngine.perform_vol_stats()
-            for vol in  hstats.volumes:
-                vol.files = sshEngine.perform_ls(vol.path)
-                vol.sumOfFiles = reduce(lambda x,y: x+y, map(lambda x:x.size, vol.files))
-            hstats.memory = sshEngine.perform_free()
-            hstats.cpus = sshEngine.perform_cpu_count()
-            sshEngine.close()
-            
-            print("Grab libvirt info from {0}...".format(hstats.name))
-            libvirt = LibvirtEngine.LibvirtEngine(hostConfig)
-            hstats.vms = libvirt.grab_vms()
-            hstats.vms_memory = reduce(lambda x,y:x+y, map(lambda x:(x.memory*x.running), hstats.vms))
-            hstats.vms_vcpus = reduce(lambda x,y:x+y, map(lambda x:(x.vcpus*x.running), hstats.vms))
-            hstats.system_memory = m2b(hostConfig.system_memory_mb)
             stats.hosts.append(hstats)
+            t = GraberThread(hstats, hostConfig)
+            myThreads.append(t)
+            t.start()
+    for t in myThreads:
+        t.join()
+
+    for hstats in stats.hosts:
+        if 'volumes' not in hstats:
+            log.ERROR("Was unable to grab info from {0} by SSH!".format(hstats.name))
+        if 'vms' not in hstats:
+            log.ERROR("Was unable to grab libvirt info from {0}!".format(hstats.name))
+        
 
     enrich(stats, config)
     
