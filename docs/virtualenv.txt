@@ -7,7 +7,7 @@ pip install virtualwrapper
 
 
 In my .profile:
-alias y='cd ~/dev/kw2/git/kvmstats; source /usr/local/bin/virtualenvwrapper.sh; workon kvmstats'
+alias k='cd ~/dev/kw2/git/bsx-stats; source /usr/local/bin/virtualenvwrapper.sh; workon bsx-stats'
 
 
 Then:
@@ -15,8 +15,8 @@ Then:
 source /usr/local/bin/virtualenvwrapper.sh
 
 
-mkvirtualenv kvmstats
-workon kvmstats
+mkvirtualenv bsx-stats
+workon bsx-stats
 pip install -r requirements.txt
 
 
@@ -26,7 +26,7 @@ pip freeze > requirements.txt
 
 
 To refresh the environnement (i.e. After useless package installation).
-rm -rf ~/.virtualenvs/kvmstats
-mkvirtualenv kvmstats
-workon kvmstats
+rm -rf ~/.virtualenvs/bsx-stats
+mkvirtualenv bsx-stats
+workon bsx-stats
 pip install -r requirements.txt

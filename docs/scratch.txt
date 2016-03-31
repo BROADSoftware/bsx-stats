@@ -1,0 +1,10 @@
+
+
+On mac, Libvirst does not works. 
+
+Need to use a vagrant based Linux VM (virsh1)
+
+cd /home/sa/dev/kw2/git/bsx-stats
+
+python stats.py --out bsa --config ../bsx-clusters/iac/yab-infra.yml
+python stats.py --out bsa --config ../bsx-clusters/iac/yab-infra.yml --projects ../bsx-clusters/iac/hdp2/def/hdp2.yml
