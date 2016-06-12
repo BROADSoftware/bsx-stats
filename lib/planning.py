@@ -104,6 +104,8 @@ def build(stats, projects):
                 cluster.hosts[host.name].vcpus += vm.vcpus
                 if vm.running == 1:
                     cluster.running = 1     # A cluster is running if at least one VM is running (This provide pessimistic planning in case of partially running cluster
+                else:
+                    cluster.running = 0
             else:
                 cluster = planning.clusters.others
                 if vm.running == 1: 
