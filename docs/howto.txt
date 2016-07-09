@@ -7,4 +7,4 @@ Need to use a vagrant based Linux VM (virsh1)
 cd /home/sa/dev/kw2/git/bsx-stats
 
 python stats.py --out bsa --config ../bsx-clusters/iac/yab-infra.yml
-python stats.py --out bsa --config ../bsx-clusters/iac/yab-infra.yml --projects ../bsx-clusters/iac/hdp2/def/hdp2.yml
+python stats.py --out bsa-hdp3 --config ../bsx-clusters/iac/yab-infra.yml --projects ../bsx-clusters/iac/hdp3/def/hdp3.yml
